@@ -6,7 +6,7 @@ import { TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
 import { fixtures, parseStored, shortDigest, SOURCE_URL } from './fixtures.js';
 import './style.css';
 
-const contractAddress = import.meta.env.VITE_CASEFLOW_ADDRESS;
+const contractAddress = import.meta.env.VITE_CASEFLOW_ADDRESS || '0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B';
 const addressOk = /^0x[a-fA-F0-9]{40}$/.test(contractAddress || '');
 const readClient = createClient({ chain: studionet });
 

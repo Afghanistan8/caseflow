@@ -4,6 +4,8 @@
 
 Caseflow is a Studionet intelligent contract and React interface for checking whether a registered **law identifier is named on one fixed U.S. Department of Justice page**: [Civil Rights Division — Laws We Enforce](https://www.justice.gov/crt/laws-we-enforce). An intelligent contract agent reads the page, validators compare the bounded list of law names, and deterministic contract code checks each registered identifier against that list.
 
+**Live Studionet contract:** `0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B` · [deployment transaction](https://explorer-studio.genlayer.com/tx/0x3a56d30f62be5c770c9a841311ca7890ba3566e601efa1083d638ea9cb73283c). The finalized deployment source matches [`contracts/caseflow.py`](contracts/caseflow.py) after line-ending normalization. [`docs/LIVE_EVIDENCE.md`](docs/LIVE_EVIDENCE.md) contains the readback details.
+
 The outcome is a page membership classification. It is **not legal advice, a determination that a law applies to a person or event, a finding of a violation, or a determination of guilt**. DOJ's page does not publish lot codes, best-by dates, or severity levels, so Caseflow does not ask validators to invent them.
 
 ## Follow a case
@@ -72,12 +74,11 @@ The Python tests use a direct GenLayer stub so they run without a Studio node. T
 ## Deploy and connect
 
 1. Open [GenLayer Studio](https://studio.genlayer.com/) and select **Studionet**, chain ID `61999`.
-2. Deploy [`contracts/caseflow.py`](contracts/caseflow.py) with its no-argument constructor using your own Studio wallet. Verify the resulting contract code and address in Studio.
-3. Copy `frontend/.env.example` to `frontend/.env` and place the **verified** address in `VITE_CASEFLOW_ADDRESS`.
-4. Run `cd frontend && npm install && npm run dev`. Connect a Studionet wallet in the interface.
-5. Record the real deployment and case transaction hashes in [`docs/LIVE_EVIDENCE.md`](docs/LIVE_EVIDENCE.md).
+2. Run `cd frontend && npm install && npm run dev`. The verified deployment address is the default; `VITE_CASEFLOW_ADDRESS` can override it for another verified deployment.
+3. Connect a Studionet wallet in the interface. Case creation, registration, sealing, and assessment each require a wallet transaction.
+4. Record future case transaction hashes and readbacks in [`docs/LIVE_EVIDENCE.md`](docs/LIVE_EVIDENCE.md).
 
-No deployment address is included here because none has been verified. Studionet fees are paid by the caller's wallet; the contract does not receive user value.
+To verify this deployment from the repository root, run `cd frontend && npm run verify:deployment -- 0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B 0x3a56d30f62be5c770c9a841311ca7890ba3566e601efa1083d638ea9cb73283c`. Studionet fees are paid by the caller's wallet; the contract does not receive user value.
 
 ## Repository map
 
