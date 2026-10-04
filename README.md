@@ -44,7 +44,7 @@ Use two or more Studio wallets. The three examples in the interface are tied to 
 | `Fair Housing Act` | Not listed on this specific page | Negative control; this says nothing about other DOJ pages |
 | `Pregnant Workers Fairness Act` | Listed | Exact page heading |
 
-Create a case with one wallet. Register at least two records from separate wallets. The creator seals the case. Any wallet can assess at the displayed case revision. Read the records and the newest epoch. A web, extraction, or consensus failure can yield `SOURCE_UNAVAILABLE`, so the listed outcomes are expectations contingent on successful source validation.
+Create a case with one wallet. Register at least two records from separate wallets. The creator seals the case. Any wallet can assess at the displayed case revision. Read the records and the newest epoch. A web or extraction failure can yield `SOURCE_UNAVAILABLE`. If validators reject the transaction with `MAJORITY_DISAGREE`, no epoch is appended and the case revision stays unchanged; the interface reports the failed transaction.
 
 ## Contract invariants
 
