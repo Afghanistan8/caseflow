@@ -1,0 +1,19 @@
+{
+  "name": "caseflow-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test src/*.test.js"
+  },
+  "dependencies": {
+    "genlayer-js": "1.1.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.2"
+  }
+}
