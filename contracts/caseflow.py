@@ -2,6 +2,7 @@
 from genlayer import *
 
 import hashlib
+import html
 import json
 import re
 
@@ -31,6 +32,19 @@ def validate_scope(raw: object) -> dict:
     if len(set(laws)) != len(laws):
         raise gl.vm.UserError("duplicate scope field")
     return {"correct_laws": sorted(laws)}
+
+
+def scope_from_page(page: str) -> dict:
+    title = re.search(r"<h1\b[^>]*>(.*?)</h1>", page, re.I | re.S)
+    if not title or html.unescape(re.sub(r"<[^>]+>", "", title.group(1))).strip() != "Laws We Enforce":
+        raise gl.vm.UserError("source title")
+    body = page[title.end():].split("<footer", 1)[0]
+    headings = []
+    for match in re.finditer(r"<h2\b[^>]*>(.*?)</h2>", body, re.I | re.S):
+        name = " ".join(html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).split())
+        if name:
+            headings.append(name)
+    return validate_scope({"correct_laws": headings})
 
 
 def intersect(record: dict, scope: dict) -> dict:
@@ -156,35 +170,11 @@ class Caseflow(gl.Contract):
         def fetch_scope() -> str:
             page_digest = ""
             try:
-                page = gl.nondet.web.render(SOURCE_URL, mode="text")
+                page = gl.nondet.web.render(SOURCE_URL, mode="html")
                 if not isinstance(page, str) or not 100 <= len(page) <= MAX_PAGE_LENGTH:
                     return canonical({"available": False, "source_digest": "", "scope": None})
-                page_digest = digest(page)
-                if "Laws We Enforce" not in page:
-                    return canonical({"available": False, "source_digest": page_digest, "scope": None})
-                prompt = (
-                    "Extract only the names or abbreviations of laws explicitly headed on this "
-                    "DOJ page. Return strict JSON with exactly scope: {correct_laws: list of "
-                    "identifiers} and evidence: {correct_laws: list of verbatim heading quotes}, "
-                    "with one quote per identifier. Return null if the page is not the DOJ Laws "
-                    "We Enforce page or the heading list is ambiguous. Do not infer legal "
-                    "applicability, guilt, jurisdiction, severity, or unstated identifiers. "
-                    "Page:\n" + page
-                )
-                answer = json.loads(gl.nondet.exec_prompt(prompt))
-                if answer is None or not isinstance(answer, dict) or set(answer) != {"scope", "evidence"}:
-                    return canonical({"available": False, "source_digest": page_digest, "scope": None})
-                evidence = answer["evidence"]
-                scope = validate_scope(answer["scope"])
-                if not isinstance(evidence, dict) or set(evidence) != {"correct_laws"}:
-                    raise gl.vm.UserError("evidence schema")
-                quotes = evidence["correct_laws"]
-                if not isinstance(quotes, list) or len(quotes) != len(scope["correct_laws"]):
-                    raise gl.vm.UserError("evidence count")
-                for identifier in scope["correct_laws"]:
-                    if not any(isinstance(quote, str) and 5 <= len(quote) <= 400
-                               and quote in page and identifier in quote for quote in quotes):
-                        raise gl.vm.UserError("ungrounded evidence")
+                scope = scope_from_page(page)
+                page_digest = digest(canonical({"source_id": SOURCE_ID, "headings": scope["correct_laws"]}))
                 return canonical({"available": True, "source_digest": page_digest, "scope": scope})
             except Exception:
                 return canonical({"available": False, "source_digest": page_digest, "scope": None})
@@ -266,6 +256,6 @@ class Caseflow(gl.Contract):
 
     @gl.public.view
     def get_protocol(self) -> str:
-        return canonical({"name": "Caseflow", "version": "0.1.0", "chain_id": 61999,
+        return canonical({"name": "Caseflow", "version": "0.3.0", "chain_id": 61999,
                           "source_id": SOURCE_ID, "source_url": SOURCE_URL,
                           "admin": False, "custody": False})

@@ -1,34 +1,30 @@
-# Caseflow · Studionet evidence ledger
+# Caseflow · verified Studionet run
 
-Fill this in only after transactions and readbacks have been observed on **Studionet (chain ID 61999)**. Keep wallet secrets out of this file.
+Observed on 2026-10-04 UTC, chain ID `61999`. All listed transactions reached `FINALIZED` with `MAJORITY_AGREE` and successful leader execution. No wallet secrets are recorded here.
 
 | Checkpoint | Observed value |
 | --- | --- |
-| Contract address | `0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B` |
-| Contract deployment transaction | `0x3a56d30f62be5c770c9a841311ca7890ba3566e601efa1083d638ea9cb73283c` · FINALIZED · execution SUCCESS |
-| Explorer link | [Studionet transaction](https://explorer-studio.genlayer.com/tx/0x3a56d30f62be5c770c9a841311ca7890ba3566e601efa1083d638ea9cb73283c) |
-| Contract code / source verification | Normalized SHA-256 `ac3fec08c0ce96c852dd83a0cf4810be8531259a1132c2ed9a3f6d551d46cc1f` for both on-chain code and `contracts/caseflow.py` |
-| `get_protocol` readback | `{"admin":false,"chain_id":61999,"custody":false,"name":"Caseflow","source_id":"DOJ_CRT_LAWS_WE_ENFORCE","source_url":"https://www.justice.gov/crt/laws-we-enforce","version":"0.1.0"}` |
-| `get_counts` readback after deployment | `{"cases":0,"epochs":0,"records":0}` |
-| Deployer wallet (public address) | `0x4184bc5e5444f250767e8d33a49817a9b4fb0df3` |
-| Creator wallet (public address) |  |
-| Independent registering wallets (public addresses) |  |
-| Case number |  |
-| Create transaction |  |
-| Record registration transactions |  |
-| Seal transaction |  |
-| Assessment transaction |  |
-| Final case revision |  |
-| Epoch number and transition |  |
-| Source digest |  |
-| Scope digest |  |
-| Per-record status readbacks |  |
-| Prior epoch readback after later assessment |  |
-| Observation date and time (UTC) | 2026-10-04 01:56 UTC |
+| Active contract | `0xcE9f13ED45AC3561659Beed43B7FD9dAfcf2A13E` |
+| Deployment | [Transaction `0x0e1233…bd026f8`](https://explorer-studio.genlayer.com/tx/0x0e12338ab8ea1229b32437285f3f04e67725ee8253ee3bca66aff7c79bd026f8) |
+| Code verification | Normalized SHA-256 `5327331e7721af533be5bd6a3f36bfae971b4182f29a96b1cf2ae7da78d19ccb` for both on-chain code and `contracts/caseflow.py` |
+| Protocol | Caseflow `0.3.0`; DOJ Civil Rights Division source; no admin or custody; Studionet `61999` |
+| Test wallet | `0x4184bc5e5444f250767e8d33a49817a9b4fb0df3` |
+| Case creation | [Transaction `0x83bd0b…4b289a`](https://explorer-studio.genlayer.com/tx/0x83bd0bc854a739d473e594d67eb7a287ccbe6c78930099f9c94d98a7554b289a) → case `1` |
+| Title VII registration | [Transaction `0xb43ea6…41d1c`](https://explorer-studio.genlayer.com/tx/0xb43ea64d3f3853f2f2d76712cd78260620e2f7f3937a6ad57b4c3ffaa7941d1c) → record `1` |
+| Fair Housing Act registration | [Transaction `0x4a6a55…a4e7b`](https://explorer-studio.genlayer.com/tx/0x4a6a553a117278939321bbe1dd8f5a360900346ddb2010f389cc361fbaca4e7b) → record `2` |
+| Seal | [Transaction `0x443ac3…a10b48`](https://explorer-studio.genlayer.com/tx/0x443ac3f67bbd18d120643f5fda851413ceec349a9d2f38f2e68f4f73caa10b48) → `SEALED`, revision `3` |
+| Assessment | [Transaction `0xc04022…3a2b4`](https://explorer-studio.genlayer.com/tx/0xc04022c47785c51a33ffb78593cdc4481a39cc21ca56b1753b5424e23733a2b4) → epoch `1` |
+| Final case readback | `SEALED`; revision `4`; 2 records; 1 epoch |
+| Epoch transition | `INITIAL`; timestamp `2026-10-04T02:40:46.017018Z` |
+| Source digest | `b96c8d6425d61527e072737bd9ba40e45809db3d4bf1eb63abb6d4fe486526d0` |
+| Scope digest | `3bb0960074df85cba3012a872fddcf4eac8f2acf841e43714185e5a9970b5a15` |
+| Record 1 readback | `AFFECTED`; `law: true` for `Title VII of the Civil Rights Act of 1964` |
+| Record 2 readback | `NOT_AFFECTED`; `law: false` for `Fair Housing Act` on this one DOJ page |
+| Final counters | `{"cases":1,"records":2,"epochs":1}` |
 
-## Review notes
+The test wallet owned both records. The direct contract tests cover distinct owners and owner-only revision, but a live multi-wallet flow has not been performed. `AFFECTED` is page membership only; it is not a legal finding.
 
-- Confirm each transaction reached finalization before copying the final readback.
-- Confirm the creator and registering wallets are distinct where expected.
-- If the page cannot be validated, record `SOURCE_UNAVAILABLE` and the actual error or receipt; do not substitute an expected verdict.
-- A page membership result does not establish legal applicability, a violation, or guilt.
+## Corrections observed during the smoke test
+
+- The first deployment, `0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B`, finalized an assessment as `SOURCE_UNAVAILABLE`; its model-based extraction did not return a verified scope. The exact failing validation stage is not exposed by that version. Its [assessment transaction](https://explorer-studio.genlayer.com/tx/0x9608e6dc93368176a82534ab3c52e221119b8d94605e9a82b354f4c34c14f789) remains public.
+- The second deployment, `0xecB1cdC12DF7FF4Cd7f5A4011d8b7DBCE95de666`, extracted all three page headings in the leader result, but its [assessment transaction](https://explorer-studio.genlayer.com/tx/0x54f4d4a3869d42de87e3fa1ffdf3cc6f51f60745bc5f952a5d1b306d297f656e) finalized with `MAJORITY_DISAGREE`; no epoch was appended. That version compared a digest of the full rendered HTML. The active contract compares a canonical digest of the heading tuple, and its subsequent live assessment reached `MAJORITY_AGREE`.

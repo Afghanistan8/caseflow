@@ -175,21 +175,25 @@ class CaseflowTests(unittest.TestCase):
         self.assertEqual(json.loads(self.contract.get_epoch(case_id, 1))["transition"], "SOURCE_UNAVAILABLE")
         self.assertNotIn("default_level", json.loads(self.contract.get_record(case_id, 1)))
 
-    def test_source_quotes_must_appear_on_the_rendered_page(self):
+    def test_html_headings_define_scope_and_exclude_navigation(self):
         case_id = self.make_sealed_case()
-        heading = "Title VII of the Civil Rights Act of 1964"
-        page = "Laws We Enforce\n" + heading + "\n" + ("DOJ source text. " * 10)
+        page = (
+            "<h2>Utilities</h2><h1>Laws We Enforce</h1>"
+            "<h2>Title VII of the Civil Rights Act of 1964</h2>"
+            "<h2>Pregnant Workers Fairness Act</h2>"
+            "<h2>The Uniformed Services Employment and Reemployment Rights Act "
+            "of 1994&nbsp;(USERRA)</h2><h2>&nbsp;</h2><footer><h2>Contact</h2></footer>"
+        )
         self.gl.nondet.web.render = lambda *args, **kwargs: page
-        self.gl.nondet.exec_prompt = lambda *args: json.dumps({
-            "scope": {"correct_laws": [heading]},
-            "evidence": {"correct_laws": [heading]},
-        })
         self.contract.assess_epoch(case_id, json.loads(self.contract.get_case(case_id))["revision"])
         self.assertEqual(json.loads(self.contract.get_epoch(case_id, 1))["transition"], "INITIAL")
-        self.gl.nondet.exec_prompt = lambda *args: json.dumps({
-            "scope": {"correct_laws": ["Fair Housing Act"]},
-            "evidence": {"correct_laws": ["Fair Housing Act"]},
-        })
+        self.assertEqual(json.loads(self.contract.get_record(case_id, 1))["status"], "AFFECTED")
+        self.assertEqual(json.loads(self.contract.get_record(case_id, 2))["status"], "NOT_AFFECTED")
+        self.assertEqual(len(self.module.scope_from_page(page)["correct_laws"]), 3)
+
+        self.gl.nondet.web.render = lambda *args, **kwargs: page.replace(
+            "<h1>Laws We Enforce</h1>", "<h1>Different page</h1>"
+        )
         self.contract.assess_epoch(case_id, json.loads(self.contract.get_case(case_id))["revision"])
         self.assertEqual(json.loads(self.contract.get_epoch(case_id, 2))["transition"], "SOURCE_UNAVAILABLE")
 

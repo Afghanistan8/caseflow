@@ -4,14 +4,16 @@ import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
 import { fixtures, parseStored, shortDigest, SOURCE_URL } from './fixtures.js';
+import { failureReason, isFinalSuccess, returnedId } from './transactions.js';
 import './style.css';
 
-const contractAddress = import.meta.env.VITE_CASEFLOW_ADDRESS || '0x1562a4EC5C8331C27f5c0C9A3d744f5b087B267B';
+const contractAddress = import.meta.env.VITE_CASEFLOW_ADDRESS || '0xcE9f13ED45AC3561659Beed43B7FD9dAfcf2A13E';
 const addressOk = /^0x[a-fA-F0-9]{40}$/.test(contractAddress || '');
 const readClient = createClient({ chain: studionet });
 
 function App() {
   const [wallet, setWallet] = useState('');
+  const [walletChainId, setWalletChainId] = useState(null);
   const [caseId, setCaseId] = useState('1');
   const [law, setLaw] = useState(fixtures[0].law_identifier);
   const [editId, setEditId] = useState('');
@@ -31,9 +33,9 @@ function App() {
     }));
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (requestedId = caseId) => {
     if (!addressOk) return;
-    const id = Number(caseId);
+    const id = Number(requestedId);
     const newCounts = await read('get_counts');
     setCounts(newCounts);
     if (!Number.isSafeInteger(id) || id < 1) {
@@ -54,8 +56,13 @@ function App() {
   useEffect(() => {
     if (!window.ethereum?.on) return;
     const changed = accounts => setWallet(accounts?.[0] || '');
+    const chainChanged = chain => setWalletChainId(Number(chain));
     window.ethereum.on('accountsChanged', changed);
-    return () => window.ethereum.removeListener?.('accountsChanged', changed);
+    window.ethereum.on('chainChanged', chainChanged);
+    return () => {
+      window.ethereum.removeListener?.('accountsChanged', changed);
+      window.ethereum.removeListener?.('chainChanged', chainChanged);
+    };
   }, []);
 
   async function connect() {
@@ -65,6 +72,9 @@ function App() {
       if (!accounts?.[0]) throw new Error('No wallet account selected.');
       const client = createClient({ chain: studionet, account: accounts[0], provider: window.ethereum });
       await client.connect('studionet');
+      const connectedChain = await window.ethereum.request({ method: 'eth_chainId' });
+      setWalletChainId(Number(connectedChain));
+      if (Number(connectedChain) !== 61999) throw new Error('Switch your wallet to Studionet (chain 61999).');
       setWallet(accounts[0]);
       setMessage('Wallet connected to Studionet.');
     } catch (error) { setMessage(String(error)); }
@@ -72,34 +82,49 @@ function App() {
 
   async function write(functionName, args) {
     if (!addressOk) { setMessage('Set VITE_CASEFLOW_ADDRESS to a verified Studionet deployment.'); return; }
-    if (!wallet) { setMessage('Connect a Studionet wallet first.'); return; }
+    if (!wallet || walletChainId !== 61999) { setMessage('Connect a wallet on Studionet (chain 61999) first.'); return; }
     setBusy(true);
     try {
       const client = createClient({ chain: studionet, account: wallet, provider: window.ethereum });
       await client.connect('studionet');
+      const currentChain = await window.ethereum.request({ method: 'eth_chainId' });
+      if (Number(currentChain) !== 61999) throw new Error('Wallet is not on Studionet (chain 61999).');
       const call = { address: contractAddress, functionName, args };
       const hash = await client.writeContract({ ...call, value: 0n });
       setMessage(`${functionName} submitted: ${hash}. Waiting for finalization…`);
-      const receipt = await client.waitForTransactionReceipt({ hash, status: TransactionStatus.FINALIZED });
-      if (receipt.resultName !== 'SUCCESS' || receipt.txExecutionResultName !== 'FINISHED_WITH_RETURN') {
-        throw new Error(`${functionName} finalized without a successful execution: ${hash}`);
+      const receipt = await client.waitForTransactionReceipt({
+        hash, status: TransactionStatus.FINALIZED, interval: 5000, retries: 120
+      });
+      if (!isFinalSuccess(receipt)) {
+        throw new Error(`${functionName} failed: ${failureReason(receipt)}. Transaction: ${hash}`);
       }
       setMessage(`${functionName} finalized: ${hash}`);
       if (functionName === 'create_case') {
-        const nextCounts = await read('get_counts');
-        if (nextCounts?.cases) setCaseId(String(nextCounts.cases));
+        const createdId = returnedId(receipt);
+        if (createdId) {
+          setCaseId(String(createdId));
+          await refresh(createdId);
+        } else {
+          setMessage(`Case created, but its ID was not present in the receipt. Transaction: ${hash}`);
+          await refresh();
+        }
+      } else {
+        await refresh();
       }
-      await refresh();
     } catch (error) { setMessage(String(error)); }
     finally { setBusy(false); }
   }
 
   const id = Number(caseId);
+  const walletReady = Boolean(wallet && walletChainId === 61999);
+  const selectedRecord = records.find(record => record.id === Number(editId));
+  const canRevise = Boolean(walletReady && caseData?.status === 'OPEN' && selectedRecord &&
+    selectedRecord.owner.toLowerCase() === wallet.toLowerCase());
   return <div className="page">
     <header className="topbar">
       <div className="brand"><span className="mark">C<span>.</span></span><span>CASEFLOW</span></div>
       <div className="network"><span className="dot" /> STUDIONET · 61999</div>
-      <button className="wallet" onClick={connect}>{wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : 'Connect wallet'}</button>
+      <button className="wallet" onClick={connect}>{walletReady ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : 'Connect wallet'}</button>
     </header>
     <main>
       <section className="hero">
@@ -114,22 +139,20 @@ function App() {
       </section>
 
       {!addressOk && <div className="banner">No verified contract address is configured. Deploy to Studionet, then set <code>VITE_CASEFLOW_ADDRESS</code>.</div>}
+      {wallet && !walletReady && <div className="banner">Your wallet is on a different network. Connect it to Studionet (chain 61999) to write.</div>}
       {message && <div className="banner" role="status">{message}</div>}
 
       <div className="grid">
         <section className="panel controls">
           <div className="sectionhead"><span>01</span><h2>Work the case</h2></div>
           <div className="fieldrow"><label>Case number<input type="number" min="1" value={caseId} onChange={e => setCaseId(e.target.value)} /></label><button onClick={() => refresh().catch(error => setMessage(String(error)))} disabled={busy || !addressOk}>Read</button></div>
-          <button className="primary" disabled={busy || !addressOk || !wallet} onClick={() => write('create_case', [])}>Create new case</button>
+          <button className="primary" disabled={busy || !addressOk || !walletReady} onClick={() => write('create_case', [])}>Create new case</button>
           <div className="divider" />
           <label>Law identifier<input value={law} onChange={e => setLaw(e.target.value)} maxLength="80" /></label>
-          <div className="buttons"><button disabled={busy || !caseData || caseData.status !== 'OPEN'} onClick={() => write('register_record', [id, law])}>Register record</button><button disabled={busy || !editId} onClick={() => {
-            const record = records.find(r => r.id === Number(editId));
-            if (record) write('update_record', [id, record.id, record.revision, law]);
-          }}>Revise own record</button></div>
+          <div className="buttons"><button disabled={busy || !walletReady || !caseData || caseData.status !== 'OPEN'} onClick={() => write('register_record', [id, law])}>Register record</button><button disabled={busy || !canRevise} onClick={() => write('update_record', [id, selectedRecord.id, selectedRecord.revision, law])}>Revise own record</button></div>
           <label>Record number to revise<input type="number" min="1" value={editId} onChange={e => setEditId(e.target.value)} placeholder="Select your record" /></label>
           <div className="divider" />
-          <div className="buttons"><button disabled={busy || !caseData || caseData.status !== 'OPEN' || caseData.creator.toLowerCase() !== wallet.toLowerCase()} onClick={() => write('seal_case', [id])}>Seal case</button><button disabled={busy || !caseData || caseData.status !== 'SEALED'} onClick={() => write('assess_epoch', [id, caseData.revision])}>Assess epoch</button></div>
+          <div className="buttons"><button disabled={busy || !walletReady || !caseData || caseData.status !== 'OPEN' || caseData.record_count < 2 || caseData.creator.toLowerCase() !== wallet.toLowerCase()} onClick={() => write('seal_case', [id])}>Seal case</button><button disabled={busy || !walletReady || !caseData || caseData.status !== 'SEALED'} onClick={() => write('assess_epoch', [id, caseData.revision])}>Assess epoch</button></div>
           <p className="hint">Only the creator seals. Any connected wallet may register while open or assess after seal. At least two records are required.</p>
         </section>
 
@@ -139,7 +162,7 @@ function App() {
           {caseData ? <><div className="casehead"><div><small>CASE {caseData.id}</small><h3>{caseData.status}</h3></div><span>revision {caseData.revision}</span></div><p className="mono">Creator: {caseData.creator}</p><p className="mono">Last valid scope: {shortDigest(caseData.last_valid_scope_digest)}</p>
             <h3 className="subheading">Registered records</h3>
             {records.map(r => <article className="record" key={r.id}><div><b>#{r.id} {r.law_identifier}</b><span className={`tag ${r.status.toLowerCase()}`}>{r.status}</span></div><p>{r.reason}</p><small>Owner {r.owner} · revision {r.revision}</small></article>)}
-          </> : <p className="empty">Enter a case number to read its state.</p>}
+          </> : <p className="empty">No case at this number yet. Create one or enter an existing case number.</p>}
         </section>
       </div>
 
